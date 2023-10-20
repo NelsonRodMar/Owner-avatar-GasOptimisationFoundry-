@@ -53,7 +53,7 @@ contract GasContract {
     function transfer(
         address _recipient,
         uint256 _amount,
-        string calldata _name
+        string calldata _name // useless but in the signature of the call in the unit test
     ) public {
         address senderOfTx = msg.sender;
         balances[senderOfTx] -= _amount;
@@ -64,22 +64,12 @@ contract GasContract {
         public
         onlyAdminOrOwner
     {
+        // this require is used
         require(
             _tier < 255,
             ""
         );
-        whitelist[_userAddrs] = _tier;
-        if (_tier > 3) {
-            whitelist[_userAddrs] -= _tier;
-            whitelist[_userAddrs] = 3;
-        } else if (_tier == 1) {
-            whitelist[_userAddrs] -= _tier;
-            whitelist[_userAddrs] = 1;
-        } else if (_tier > 0 && _tier < 3) {
-            whitelist[_userAddrs] -= _tier;
-            whitelist[_userAddrs] = 2;
-        }
-        
+        whitelist[_userAddrs] = _tier > 3 ? 3 : _tier;
         emit AddedToWhitelist(_userAddrs, _tier);
     }
 
@@ -90,18 +80,8 @@ contract GasContract {
         address senderOfTx = msg.sender;
         whiteListStruct[senderOfTx] = ImportantStruct(_amount, true);
         
-        require(
-            balances[senderOfTx] >= _amount,
-            ""
-        );
-        require(
-            _amount > 3,
-            ""
-        );
-        balances[senderOfTx] -= _amount;
-        balances[_recipient] += _amount;
-        balances[senderOfTx] += whitelist[senderOfTx];
-        balances[_recipient] -= whitelist[senderOfTx];
+        balances[senderOfTx] = balances[senderOfTx] - _amount + whitelist[senderOfTx];
+        balances[_recipient] = balances[_recipient] + _amount - whitelist[senderOfTx];
 
         emit WhiteListTransfer(_recipient);
     }
