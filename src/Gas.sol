@@ -5,60 +5,28 @@ pragma solidity 0.8.0;
 contract GasContract {
 
     address public contractOwner;
-    bool public isReady = false;
-    uint256 public totalSupply; // cannot be updated
-    uint256 public paymentCounter;
     mapping(address => uint256) public balances;
-    mapping(address => Payment[]) public payments;
+    /* 
+        tried to make whitelist a uint8 since the value will be <= 3
+        but somehow my method is more expensive in gas...
+    */
     mapping(address => uint256) public whitelist;
     address[5] public administrators;
-    enum PaymentType {
-        Unknown,
-        BasicPayment
-    }
-    PaymentType constant defaultPayment = PaymentType.Unknown;
-
-    History[] public paymentHistory; // when a payment was updated
-
-    struct Payment {
-        PaymentType paymentType;
-        bool adminUpdated;
-        address admin; // administrators address
-        uint256 paymentID;
-        string recipientName; // max 8 characters
-        address recipient;
-        uint256 amount;
-    }
-
-    struct History {
-        uint256 lastUpdate;
-        address updatedBy;
-        uint256 blockNumber;
-    }
-    uint256 wasLastOdd = 1;
-    mapping(address => uint256) public isOddWhitelistUser;
+    
     
     struct ImportantStruct {
         uint256 amount;
-        uint256 valueA; // max 3 digits
-        uint256 bigValue;
-        uint256 valueB; // max 3 digits
         bool paymentStatus;
-        address sender;
     }
     mapping(address => ImportantStruct) public whiteListStruct;
 
+    // I tried to convert this 'tier' to a uint8 since it has to be <255, 
+    // forcing a type conversion in 'addToWhitelist', but won't work with the unit tests
     event AddedToWhitelist(address userAddress, uint256 tier);
 
     modifier onlyAdminOrOwner() {
         address senderOfTx = msg.sender;
-        if (checkForAdmin(senderOfTx)) {
-            require(
-                checkForAdmin(senderOfTx),
-                ""
-            );
-            _;
-        } else if (senderOfTx == contractOwner) {
+        if (senderOfTx == contractOwner) {
             _;
         } else {
             revert(
@@ -71,82 +39,43 @@ contract GasContract {
 
     constructor(address[] memory _admins, uint256 _totalSupply) {
         contractOwner = msg.sender;
-        totalSupply = _totalSupply;
 
-        for (uint8 i = 0; i < administrators.length; i++) {
-            if (_admins[i] != address(0)) {
-                administrators[i] = _admins[i];
-                if (_admins[i] == contractOwner) {
-                    balances[contractOwner] = totalSupply;
-                } else {
-                    balances[_admins[i]] = 0;
-                }
-            }
+        for (uint8 i = 0; i < _admins.length; i++) {
+            administrators[i] = _admins[i];             
         }
+        balances[contractOwner] = _totalSupply;
     }
 
-    function gePaymentHistory()
-        public
-        payable
-        returns (History[] memory paymentHistory_)
-    {
-        return paymentHistory;
-    }
-
-    function checkForAdmin(address _user) public view returns (bool admin_) {
-        bool admin = false;
-        for (uint8 i = 0; i < administrators.length; i++) {
-            if (administrators[i] == _user) {
-                admin = true;
-            }
-        }
-        return admin;
-    }
-
+    // used in the unit tests
     function balanceOf(address _user) public view returns (uint256 balance_) {
-        uint256 balance = balances[_user];
-        return balance;
+        return balances[_user]; 
     }
 
     function transfer(
         address _recipient,
         uint256 _amount,
-        string calldata _name
+        string calldata _name // useless but in the signature of the call in the unit test
     ) public {
         address senderOfTx = msg.sender;
         balances[senderOfTx] -= _amount;
         balances[_recipient] += _amount;
     }
 
+    // since _tier is supposed to be < 255, can we somehow make it a uint8?
     function addToWhitelist(address _userAddrs, uint256 _tier)
         public
         onlyAdminOrOwner
     {
+        // this require is used
         require(
             _tier < 255,
             ""
         );
-        whitelist[_userAddrs] = _tier;
-        if (_tier > 3) {
-            whitelist[_userAddrs] -= _tier;
-            whitelist[_userAddrs] = 3;
-        } else if (_tier == 1) {
-            whitelist[_userAddrs] -= _tier;
-            whitelist[_userAddrs] = 1;
-        } else if (_tier > 0 && _tier < 3) {
-            whitelist[_userAddrs] -= _tier;
-            whitelist[_userAddrs] = 2;
-        }
-        uint256 wasLastAddedOdd = wasLastOdd;
-        if (wasLastAddedOdd == 1) {
-            wasLastOdd = 0;
-            isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
-        } else if (wasLastAddedOdd == 0) {
-            wasLastOdd = 1;
-            isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
-        } else {
-            revert("");
-        }
+        /*
+            this is somehow more expensive:
+            whitelist[_userAddrs] = uint8(_tier) > 3 ? 3 : uint8(_tier);
+        */
+        whitelist[_userAddrs] = _tier > 3 ? 3 : _tier;
         emit AddedToWhitelist(_userAddrs, _tier);
     }
 
@@ -155,25 +84,15 @@ contract GasContract {
         uint256 _amount
     ) public {
         address senderOfTx = msg.sender;
-        whiteListStruct[senderOfTx] = ImportantStruct(_amount, 0, 0, 0, true, msg.sender);
+        whiteListStruct[senderOfTx] = ImportantStruct(_amount, true);
         
-        require(
-            balances[senderOfTx] >= _amount,
-            ""
-        );
-        require(
-            _amount > 3,
-            ""
-        );
-        balances[senderOfTx] -= _amount;
-        balances[_recipient] += _amount;
-        balances[senderOfTx] += whitelist[senderOfTx];
-        balances[_recipient] -= whitelist[senderOfTx];
+        balances[senderOfTx] = balances[senderOfTx] - _amount + whitelist[senderOfTx];
+        balances[_recipient] = balances[_recipient] + _amount - whitelist[senderOfTx];
 
         emit WhiteListTransfer(_recipient);
     }
 
-
+    // used in unit tests
     function getPaymentStatus(address sender) public view returns (bool, uint256) {
         return (whiteListStruct[sender].paymentStatus, whiteListStruct[sender].amount);
     }
