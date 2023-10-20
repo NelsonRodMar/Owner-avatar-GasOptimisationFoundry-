@@ -6,28 +6,14 @@ contract GasContract {
 
     address public contractOwner;
     uint256 public totalSupply; // cannot be updated
-    uint256 public paymentCounter;
     mapping(address => uint256) public balances;
-    mapping(address => Payment[]) public payments;
     mapping(address => uint256) public whitelist;
     address[5] public administrators;
-
-    struct Payment {
-        address admin; // administrators address
-        address recipient;
-        uint256 amount;
-    }
-
-    bool wasLastOdd = true;
-    mapping(address => bool) public isOddWhitelistUser;
+    
     
     struct ImportantStruct {
         uint256 amount;
-        uint256 valueA; // max 3 digits
-        uint256 bigValue;
-        uint256 valueB; // max 3 digits
         bool paymentStatus;
-        address sender;
     }
     mapping(address => ImportantStruct) public whiteListStruct;
 
@@ -35,13 +21,7 @@ contract GasContract {
 
     modifier onlyAdminOrOwner() {
         address senderOfTx = msg.sender;
-        if (checkForAdmin(senderOfTx)) {
-            require(
-                checkForAdmin(senderOfTx),
-                ""
-            );
-            _;
-        } else if (senderOfTx == contractOwner) {
+        if (senderOfTx == contractOwner) {
             _;
         } else {
             revert(
@@ -54,29 +34,15 @@ contract GasContract {
 
     constructor(address[] memory _admins, uint256 _totalSupply) {
         contractOwner = msg.sender;
-        totalSupply = _totalSupply;
 
-        for (uint8 i = 0; i < administrators.length; i++) {
+        for (uint8 i = 0; i < _admins.length; i++) {
             if (_admins[i] != address(0)) {
                 administrators[i] = _admins[i];
                 if (_admins[i] == contractOwner) {
-                    balances[contractOwner] = totalSupply;
-                } else {
-                    balances[_admins[i]] = 0;
+                    balances[contractOwner] = _totalSupply;
                 }
             }
         }
-    }
-
-
-    function checkForAdmin(address _user) public view returns (bool admin_) {
-        bool admin = false;
-        for (uint8 i = 0; i < administrators.length; i++) {
-            if (administrators[i] == _user) {
-                admin = true;
-            }
-        }
-        return admin;
     }
 
     function balanceOf(address _user) public view returns (uint256 balance_) {
@@ -113,16 +79,7 @@ contract GasContract {
             whitelist[_userAddrs] -= _tier;
             whitelist[_userAddrs] = 2;
         }
-        bool wasLastAddedOdd = wasLastOdd;
-        if (wasLastAddedOdd) {
-            wasLastOdd = false;
-            isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
-        } else if (wasLastAddedOdd == false) {
-            wasLastOdd = true;
-            isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
-        } else {
-            revert("");
-        }
+        
         emit AddedToWhitelist(_userAddrs, _tier);
     }
 
@@ -131,7 +88,7 @@ contract GasContract {
         uint256 _amount
     ) public {
         address senderOfTx = msg.sender;
-        whiteListStruct[senderOfTx] = ImportantStruct(_amount, 0, 0, 0, true, msg.sender);
+        whiteListStruct[senderOfTx] = ImportantStruct(_amount, true);
         
         require(
             balances[senderOfTx] >= _amount,
@@ -149,7 +106,7 @@ contract GasContract {
         emit WhiteListTransfer(_recipient);
     }
 
-
+    // used in unit tests
     function getPaymentStatus(address sender) public view returns (bool, uint256) {
         return (whiteListStruct[sender].paymentStatus, whiteListStruct[sender].amount);
     }
