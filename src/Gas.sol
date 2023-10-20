@@ -5,8 +5,11 @@ pragma solidity 0.8.0;
 contract GasContract {
 
     address public contractOwner;
-    uint256 public totalSupply; // cannot be updated
     mapping(address => uint256) public balances;
+    /* 
+        tried to make whitelist a uint8 since the value will be <= 3
+        but somehow my method is more expensive in gas...
+    */
     mapping(address => uint256) public whitelist;
     address[5] public administrators;
     
@@ -17,6 +20,8 @@ contract GasContract {
     }
     mapping(address => ImportantStruct) public whiteListStruct;
 
+    // I tried to convert this 'tier' to a uint8 since it has to be <255, 
+    // forcing a type conversion in 'addToWhitelist', but won't work with the unit tests
     event AddedToWhitelist(address userAddress, uint256 tier);
 
     modifier onlyAdminOrOwner() {
@@ -36,18 +41,14 @@ contract GasContract {
         contractOwner = msg.sender;
 
         for (uint8 i = 0; i < _admins.length; i++) {
-            if (_admins[i] != address(0)) {
-                administrators[i] = _admins[i];
-                if (_admins[i] == contractOwner) {
-                    balances[contractOwner] = _totalSupply;
-                }
-            }
+            administrators[i] = _admins[i];             
         }
+        balances[contractOwner] = _totalSupply;
     }
 
+    // used in the unit tests
     function balanceOf(address _user) public view returns (uint256 balance_) {
-        uint256 balance = balances[_user];
-        return balance;
+        return balances[_user]; 
     }
 
     function transfer(
@@ -60,6 +61,7 @@ contract GasContract {
         balances[_recipient] += _amount;
     }
 
+    // since _tier is supposed to be < 255, can we somehow make it a uint8?
     function addToWhitelist(address _userAddrs, uint256 _tier)
         public
         onlyAdminOrOwner
@@ -69,6 +71,10 @@ contract GasContract {
             _tier < 255,
             ""
         );
+        /*
+            this is somehow more expensive:
+            whitelist[_userAddrs] = uint8(_tier) > 3 ? 3 : uint8(_tier);
+        */
         whitelist[_userAddrs] = _tier > 3 ? 3 : _tier;
         emit AddedToWhitelist(_userAddrs, _tier);
     }
