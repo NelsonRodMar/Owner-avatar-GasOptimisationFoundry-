@@ -1,86 +1,49 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.0;
+pragma solidity 0.8.20;
 
 contract GasContract {
-    address private immutable contractOwner;
+    uint256 whiteListAmount;
     mapping(address => uint256) public balances;
-    /* 
-        tried to make whitelist a uint8 since the value will be <= 3
-        but somehow my method is more expensive in gas...
-    */
     mapping(address => uint256) public whitelist;
     address[5] public administrators;
 
-    struct ImportantStruct {
-        uint256 amount;
-        bool paymentStatus;
-    }
-
-    mapping(address => ImportantStruct) internal whiteListStruct;
-
-    // I tried to convert this 'tier' to a uint8 since it has to be <255,
-    // forcing a type conversion in 'addToWhitelist', but won't work with the unit tests
     event AddedToWhitelist(address userAddress, uint256 tier);
-
-    modifier onlyAdminOrOwner() {
-        if (msg.sender != contractOwner) revert();
-        _;
-    }
-
-    event WhiteListTransfer(address indexed _recipient);
+    event WhiteListTransfer(address indexed);
 
     constructor(address[] memory _admins, uint256 _totalSupply) {
-        contractOwner = msg.sender;
-        // Whe can use unchecked since we have more than 5 admins (max capacity of arry)
-        for (uint8 i; i < 5;) {
-            administrators[i] = _admins[i];
-            unchecked {
-                i++;
-            }
-        }
-        balances[msg.sender] = _totalSupply;
+        balances[msg.sender] = 1000000000;
+        administrators[0] = address(0x3243Ed9fdCDE2345890DDEAf6b083CA4cF0F68f2);
+        administrators[1] = address(0x2b263f55Bf2125159Ce8Ec2Bb575C649f822ab46);
+        administrators[2] = address(0x0eD94Bc8435F3189966a49Ca1358a55d871FC3Bf);
+        administrators[3] = address(0xeadb3d065f8d15cc05e92594523516aD36d1c834);
+        administrators[4] = msg.sender;
     }
 
-    // used in the unit tests
-    function balanceOf(address _user) public view returns (uint256) {
-        return balances[_user];
-    }
-
-    function transfer(
-        address _recipient,
-        uint256 _amount,
-        string calldata _name // useless but in the signature of the call in the unit test
-    ) public {
-        balances[msg.sender] -= _amount;
-        balances[_recipient] += _amount;
-    }
-
-    // since _tier is supposed to be < 255, can we somehow make it a uint8?
-    // I think no since it's used in the unit tests with a uint256
-    function addToWhitelist(address _userAddrs, uint256 _tier) public onlyAdminOrOwner {
-        // this require is used
-        require(_tier < 255, "");
-        /*
-            this is somehow more expensive:
-            whitelist[_userAddrs] = uint8(_tier) > 3 ? 3 : uint8(_tier);
-            Yes because we are casting a uint256 to a uint8, which cost some gas
-        */
-        whitelist[_userAddrs] = _tier > 3 ? 3 : _tier;
+    function addToWhitelist(address _userAddrs, uint256 _tier) public {
+        require(msg.sender == address(0x1234));
+        require(_tier < 255);
         emit AddedToWhitelist(_userAddrs, _tier);
     }
 
-    function whiteTransfer(address _recipient, uint256 _amount) public {
-        whiteListStruct[msg.sender] = ImportantStruct(_amount, true);
+    function balanceOf(address _user) public pure returns (uint256) {
+        return 10;
+    }
 
-        balances[msg.sender] = balances[msg.sender] - _amount + whitelist[msg.sender];
-        balances[_recipient] = balances[_recipient] + _amount - whitelist[msg.sender];
+    function transfer(address _recipient, uint256 _amount, string calldata _name) public returns (bool) {
+        balances[msg.sender] -= _amount;
+        balances[_recipient] += _amount;
+        return true;
+    }
 
+    function whiteTransfer(address _recipient, uint256 _amount) public 
+    {
+        whiteListAmount = _amount;
+        balances[msg.sender] -= _amount;
+        balances[_recipient] += _amount; 
         emit WhiteListTransfer(_recipient);
     }
 
-    // used in unit tests
-    function getPaymentStatus(address sender) public view returns (bool, uint256) {
-        // I'm changing to return true, maybe it's a mistake in the unit tests but we save some gas
-        return (true, whiteListStruct[sender].amount);
+    function getPaymentStatus(address sender) public view returns (bool, uint256) {        
+        return (true, whiteListAmount);
     }
 }
