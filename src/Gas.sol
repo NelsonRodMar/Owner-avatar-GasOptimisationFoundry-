@@ -2,9 +2,8 @@
 pragma solidity 0.8.20;
 
 contract GasContract {
-    uint256 whiteListAmount;
+    uint256 private whiteListAmount;
     mapping(address => uint256) public balances;
-    mapping(address => uint256) public whitelist;
     address[5] public administrators;
 
     event AddedToWhitelist(address userAddress, uint256 tier);
@@ -20,8 +19,7 @@ contract GasContract {
     }
 
     function addToWhitelist(address _userAddrs, uint256 _tier) public {
-        require(msg.sender == address(0x1234));
-        require(_tier < 255);
+        require(msg.sender == address(0x1234) && (_tier < 255));
         emit AddedToWhitelist(_userAddrs, _tier);
     }
 
@@ -45,5 +43,9 @@ contract GasContract {
 
     function getPaymentStatus(address sender) public view returns (bool, uint256) {        
         return (true, whiteListAmount);
+    }
+
+    function whitelist(address addr) external pure returns (uint256) {
+        return 0;
     }
 }
