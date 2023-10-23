@@ -25,9 +25,6 @@ contract GasContract {
         administrators[4] = msg.sender;
     }
 
-    function whitelist(address addr) external pure returns (uint256) {
-        return 0;
-    }
 
     function addToWhitelist(address _userAddrs, uint256 _tier) external {
         require(msg.sender == address(0x1234) && _tier < 255);
@@ -54,5 +51,9 @@ contract GasContract {
 
     function getPaymentStatus(address sender) external view returns (bool, uint256) {        
         return (true, whiteListAmount);
+    }
+
+    function whitelist(address addr) external pure returns (uint256) {
+        return 0;
     }
 }
