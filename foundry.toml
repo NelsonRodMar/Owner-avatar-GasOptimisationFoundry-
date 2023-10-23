@@ -5,5 +5,4 @@ libs = ['lib']
 optimize = false
 optimizer_runs = 0
 
-
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
